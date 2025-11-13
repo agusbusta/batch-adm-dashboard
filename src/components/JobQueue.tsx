@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Job } from '../types';
 import { JobStatusBadge } from './Badge';
@@ -20,23 +20,26 @@ const JobQueue: React.FC<JobQueueProps> = ({ jobs, onPriorityChange, loading = f
   const navigate = useNavigate();
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [sortedJobs, setSortedJobs] = useState<QueuedJob[]>([]);
 
-  // Add priority to jobs (simulated - in real app this would come from API)
-  const queuedJobs: QueuedJob[] = jobs.map((job, index) => ({
-    ...job,
-    priority: (job.metadata as Record<string, unknown>)?.priority as number | undefined || 100 - index, // Default priority
-    queuedAt: job.created_at,
-  }));
+  // Add priority to jobs and sort (using useMemo to prevent infinite loops)
+  const queuedJobs: QueuedJob[] = useMemo(() => {
+    return jobs.map((job, index) => ({
+      ...job,
+      priority: (job.metadata as Record<string, unknown>)?.priority as number | undefined || 100 - index, // Default priority
+      queuedAt: job.created_at,
+    }));
+  }, [jobs]);
 
-  // Sort by priority (higher priority = lower number)
-  const [sortedJobs, setSortedJobs] = useState<QueuedJob[]>(() => 
-    [...queuedJobs].sort((a, b) => (a.priority || 100) - (b.priority || 100))
-  );
-
-  // Update sorted jobs when queuedJobs change
-  React.useEffect(() => {
-    setSortedJobs([...queuedJobs].sort((a, b) => (a.priority || 100) - (b.priority || 100)));
+  // Sort by priority (higher priority = lower number) - using useMemo
+  const initialSortedJobs = useMemo(() => {
+    return [...queuedJobs].sort((a, b) => (a.priority || 100) - (b.priority || 100));
   }, [queuedJobs]);
+
+  // Initialize sortedJobs only once when queuedJobs change
+  React.useEffect(() => {
+    setSortedJobs(initialSortedJobs);
+  }, [initialSortedJobs]);
 
   const formatQueueTime = (queuedAt: string) => {
     const queued = new Date(queuedAt);
